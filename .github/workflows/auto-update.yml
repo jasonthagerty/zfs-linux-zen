@@ -20,24 +20,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq curl
-
       - name: Configure git
         run: |
           git config user.name "ZFS Auto Update Bot"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Make update script executable
-        run: chmod +x scripts/update-package.sh
-
-      - name: Check for updates
-        id: check_update
-        run: |
-          ./scripts/update-package.sh
-        continue-on-error: false
+      - name: Update package
+        id: update
+        uses: ./.github/actions/update-zfs-package
+        with:
+          package-type: auto  # Auto-detect from PKGBUILD
 
       - name: Check for changes
         id: check_changes
@@ -51,15 +43,21 @@ jobs:
       - name: Commit and push changes
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          # Get version info from PKGBUILD
-          ZFS_VERSION=$(grep -oP '_zfsver="\K[^"]+' PKGBUILD)
-          KERNEL_VERSION=$(grep -oP '_kernelver="\K[^"]+' PKGBUILD)
+          # Get version info from outputs
+          ZFS_VERSION="${{ steps.update.outputs.zfs_version }}"
+          KERNEL_VERSION="${{ steps.update.outputs.kernel_version }}"
 
           # Add changed files
-          git add PKGBUILD .SRCINFO
+          git add PKGBUILD .SRCINFO 2>/dev/null || git add PKGBUILD
 
-          # Create commit
-          git commit -m "Automated update for kernel ${KERNEL_VERSION} + zfs ${ZFS_VERSION}"
+          # Create commit message based on package type
+          if [ -n "$KERNEL_VERSION" ]; then
+            # zfs-linux-zen package
+            git commit -m "Automated update for kernel ${KERNEL_VERSION} + zfs ${ZFS_VERSION}"
+          else
+            # zfs-utils package
+            git commit -m "Automated update for zfs ${ZFS_VERSION}"
+          fi
 
           # Push changes
           git push
@@ -71,13 +69,16 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [ "${{ steps.check_changes.outputs.has_changes }}" == "true" ]; then
-            ZFS_VERSION=$(grep -oP '_zfsver="\K[^"]+' PKGBUILD)
-            KERNEL_VERSION=$(grep -oP '_kernelver="\K[^"]+' PKGBUILD)
             echo "✅ **Package updated successfully!**" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "- **ZFS Version:** ${ZFS_VERSION}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Kernel Version:** ${KERNEL_VERSION}" >> $GITHUB_STEP_SUMMARY
-          else
+            echo "**Update Details:**" >> $GITHUB_STEP_SUMMARY
+            echo "${{ steps.update.outputs.update_reason }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- **ZFS Version:** ${{ steps.update.outputs.zfs_version }}" >> $GITHUB_STEP_SUMMARY
+            if [ -n "${{ steps.update.outputs.kernel_version }}" ]; then
+              echo "- **Kernel Version:** ${{ steps.update.outputs.kernel_version }}" >> $GITHUB_STEP_SUMMARY
+            fi
+          elif [ "${{ steps.update.outputs.up_to_date }}" == "true" ]; then
             echo "ℹ️ **No updates needed** - Package is already up to date" >> $GITHUB_STEP_SUMMARY
           fi
 
