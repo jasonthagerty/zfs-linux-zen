@@ -51,9 +51,20 @@ The [`manual-update.yml`](.github/workflows/manual-update.yml) workflow can be t
 
 ## Components
 
-### Update Script
+### Reusable Action
 
-[`scripts/update-package.sh`](scripts/update-package.sh) contains the core update logic:
+[`.github/actions/update-zfs-package/`](.github/actions/update-zfs-package/) - A reusable composite action that can be used in multiple ZFS package repositories:
+
+- **Generic Design**: Supports both `zfs-linux-zen` and `zfs-utils` packages
+- **Auto-Detection**: Automatically detects package type from PKGBUILD
+- **Portable**: Can be copied to other repositories
+- **Configurable**: Accepts package-type parameter for explicit control
+
+See [REUSABLE_ACTION.md](REUSABLE_ACTION.md) for detailed usage in multiple repositories.
+
+### Legacy Update Script
+
+[`scripts/update-package.sh`](scripts/update-package.sh) - Original standalone script (deprecated in favor of reusable action):
 
 - `get_latest_kernel_version()` - Fetches latest linux-zen version from Arch repos
 - `get_latest_zfs_version()` - Fetches latest OpenZFS release from GitHub

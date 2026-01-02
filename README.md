@@ -50,8 +50,9 @@ This repository uses GitHub Actions to automatically monitor and update the pack
 - **Automatic Updates**: Updates PKGBUILD when new versions are available
 - **Scheduled Runs**: Every 6 hours (4 times daily)
 - **Manual Triggers**: Can be run on-demand for testing or emergency updates
+- **Reusable Action**: Can be copied to other ZFS package repositories (zfs-utils, etc.)
 
-See [AUTOMATION.md](AUTOMATION.md) for detailed documentation.
+See [AUTOMATION.md](AUTOMATION.md) for detailed documentation, or [REUSABLE_ACTION.md](REUSABLE_ACTION.md) for using this action in multiple repositories.
 
 ## Why This Package?
 
