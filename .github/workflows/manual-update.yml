@@ -1,0 +1,151 @@
+name: Manual Update
+
+on:
+  workflow_dispatch:
+    inputs:
+      zfs_version:
+        description: 'Specific ZFS version to use (leave empty for latest)'
+        required: false
+        type: string
+      kernel_version:
+        description: 'Specific kernel version to use (leave empty for latest)'
+        required: false
+        type: string
+      dry_run:
+        description: 'Dry run (do not commit/push)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  manual-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl
+
+      - name: Configure git
+        run: |
+          git config user.name "ZFS Manual Update"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Make update script executable
+        run: chmod +x scripts/update-package.sh
+
+      - name: Run update with custom versions
+        id: update
+        env:
+          CUSTOM_ZFS_VERSION: ${{ inputs.zfs_version }}
+          CUSTOM_KERNEL_VERSION: ${{ inputs.kernel_version }}
+        run: |
+          # If custom versions are specified, modify the script behavior
+          if [ -n "$CUSTOM_ZFS_VERSION" ] || [ -n "$CUSTOM_KERNEL_VERSION" ]; then
+            echo "Custom versions specified - manual update mode"
+
+            # Get current versions
+            CURRENT_ZFS=$(grep -oP '_zfsver="\K[^"]+' PKGBUILD)
+            CURRENT_KERNEL=$(grep -oP '_kernelver="\K[^"]+' PKGBUILD)
+
+            # Use custom or current versions
+            NEW_ZFS=${CUSTOM_ZFS_VERSION:-$CURRENT_ZFS}
+            NEW_KERNEL=${CUSTOM_KERNEL_VERSION:-$CURRENT_KERNEL}
+
+            echo "Updating to ZFS: $NEW_ZFS, Kernel: $NEW_KERNEL"
+
+            # Download and get checksum if ZFS version changed
+            if [ "$NEW_ZFS" != "$CURRENT_ZFS" ]; then
+              echo "Downloading ZFS tarball for checksum..."
+              TMP_FILE=$(mktemp)
+              curl -L -s -o "$TMP_FILE" "https://github.com/openzfs/zfs/releases/download/zfs-${NEW_ZFS}/zfs-${NEW_ZFS}.tar.gz"
+              NEW_SHA256=$(sha256sum "$TMP_FILE" | awk '{print $1}')
+              rm -f "$TMP_FILE"
+              echo "New SHA256: $NEW_SHA256"
+            else
+              NEW_SHA256=$(grep -oP 'sha256sums=\("\K[^"]+' PKGBUILD)
+            fi
+
+            # Update PKGBUILD
+            sed -i "s/_zfsver=\"[^\"]*\"/_zfsver=\"${NEW_ZFS}\"/" PKGBUILD
+            sed -i "s/_kernelver=\"[^\"]*\"/_kernelver=\"${NEW_KERNEL}\"/" PKGBUILD
+            sed -i "s/_kernelver_full=\"[^\"]*\"/_kernelver_full=\"${NEW_KERNEL}\"/" PKGBUILD
+            sed -i "s/sha256sums=(\"[^\"]*\")/sha256sums=(\"${NEW_SHA256}\")/" PKGBUILD
+            sed -i "s/pkgrel=.*/pkgrel=1/" PKGBUILD
+
+            echo "ZFS_VERSION=$NEW_ZFS" >> $GITHUB_OUTPUT
+            echo "KERNEL_VERSION=$NEW_KERNEL" >> $GITHUB_OUTPUT
+          else
+            # Run normal automated update
+            ./scripts/update-package.sh
+          fi
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          if git diff --quiet PKGBUILD; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Show diff
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          echo "## Changes to PKGBUILD" >> $GITHUB_STEP_SUMMARY
+          echo '```diff' >> $GITHUB_STEP_SUMMARY
+          git diff PKGBUILD >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Commit and push changes
+        if: steps.check_changes.outputs.has_changes == 'true' && inputs.dry_run == false
+        run: |
+          ZFS_VERSION=$(grep -oP '_zfsver="\K[^"]+' PKGBUILD)
+          KERNEL_VERSION=$(grep -oP '_kernelver="\K[^"]+' PKGBUILD)
+
+          git add PKGBUILD .SRCINFO
+
+          if [ -n "${{ inputs.zfs_version }}" ] || [ -n "${{ inputs.kernel_version }}" ]; then
+            git commit -m "Manual update for kernel ${KERNEL_VERSION} + zfs ${ZFS_VERSION}"
+          else
+            git commit -m "Automated update for kernel ${KERNEL_VERSION} + zfs ${ZFS_VERSION}"
+          fi
+
+          git push
+
+      - name: Create summary
+        if: always()
+        run: |
+          echo "## Manual Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ inputs.dry_run }}" == "true" ]; then
+            echo "🔍 **Dry Run Mode** - No changes committed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ steps.check_changes.outputs.has_changes }}" == "true" ]; then
+            ZFS_VERSION=$(grep -oP '_zfsver="\K[^"]+' PKGBUILD)
+            KERNEL_VERSION=$(grep -oP '_kernelver="\K[^"]+' PKGBUILD)
+
+            if [ "${{ inputs.dry_run }}" == "false" ]; then
+              echo "✅ **Package updated successfully!**" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "ℹ️ **Changes detected but not committed (dry run)**" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- **ZFS Version:** ${ZFS_VERSION}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Kernel Version:** ${KERNEL_VERSION}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ **No updates needed**" >> $GITHUB_STEP_SUMMARY
+          fi
