@@ -1,137 +1,196 @@
-# zfs-linux-zen
+# ZFS Linux-Zen - Automated Arch Linux Package
 
-Automated AUR package for ZFS kernel modules compiled against the linux-zen kernel.
+This repository provides automatically updated ZFS kernel modules for the Arch Linux `linux-zen` kernel.
 
-## Overview
+## Features
 
-This repository maintains the `zfs-linux-zen` package for Arch Linux, providing pre-compiled ZFS kernel modules specifically built for the [linux-zen](https://archlinux.org/packages/extra/x86_64/linux-zen/) kernel variant.
-
-## Key Features
-
-- **Fully Automated Updates**: Checks for new kernel and ZFS releases every 6 hours
-- **Always In Sync**: Automatically updates when either upstream changes
-- **Zero Maintenance**: Commits and pushes updates without manual intervention
-- **Transparent**: All automation visible in this repository
+- **Automatic Updates**: Checks for new OpenZFS and linux-zen releases every 6 hours
+- **Kernel Tracking**: Automatically rebuilds when linux-zen kernel updates
+- **Automated Building**: Builds and publishes packages automatically via GitHub Actions
+- **GitHub Pages Hosting**: Packages hosted as a custom Arch repository
 
 ## Installation
 
-Install from the AUR:
+### 1. Add the Repository
 
-```bash
-# Using yay
-yay -S zfs-linux-zen
+Add the following to `/etc/pacman.conf`:
 
-# Using paru
-paru -S zfs-linux-zen
-
-# Manual build
-git clone https://aur.archlinux.org/zfs-linux-zen.git
-cd zfs-linux-zen
-makepkg -si
+```ini
+[archzfs]
+Server = https://jasonthagerty.github.io/zfs-utils/repo
+Server = https://jasonthagerty.github.io/zfs-linux-zen/repo
+SigLevel = Optional TrustAll
 ```
 
-## Package Contents
+**Note**: Both repository URLs are required because `zfs-linux-zen` depends on `zfs-utils`.
 
-This package provides:
+### 2. Update Package Database
 
-- **zfs-linux-zen**: Kernel modules for ZFS filesystem
-- **zfs-linux-zen-headers**: Development headers for ZFS
+```bash
+sudo pacman -Sy
+```
 
-Dependencies:
-- `linux-zen` - The zen kernel
-- `zfs-utils` - ZFS userspace utilities
-- `kmod` - Kernel module tools
+### 3. Install ZFS
 
-## Automation
+```bash
+sudo pacman -S zfs-utils zfs-linux-zen
+```
 
-This repository uses GitHub Actions to automatically monitor and update the package:
+### 4. Load ZFS Module
 
-- **Upstream Monitoring**: Checks OpenZFS and linux-zen releases
-- **Automatic Updates**: Updates PKGBUILD when new versions are available
-- **Scheduled Runs**: Every 6 hours (4 times daily)
-- **Manual Triggers**: Can be run on-demand for testing or emergency updates
-- **Reusable Action**: Can be copied to other ZFS package repositories (zfs-utils, etc.)
+```bash
+sudo modprobe zfs
+```
 
-See [AUTOMATION.md](AUTOMATION.md) for detailed documentation, or [REUSABLE_ACTION.md](REUSABLE_ACTION.md) for using this action in multiple repositories.
+### 5. Enable ZFS Services (Optional)
 
-## Why This Package?
+```bash
+sudo systemctl enable zfs-import-cache.service
+sudo systemctl enable zfs-import.target
+sudo systemctl enable zfs-mount.service
+sudo systemctl enable zfs.target
+```
 
-The linux-zen kernel is optimized for desktop performance with additional patches. ZFS modules must be compiled specifically for each kernel version. This package:
+## Packages Provided
 
-1. Tracks the exact linux-zen version
-2. Compiles ZFS modules against that specific kernel
-3. Updates automatically when either upstream changes
-4. Prevents version mismatch issues
+- `zfs-linux-zen` - ZFS kernel modules for linux-zen
+- `zfs-linux-zen-headers` - Development headers for ZFS modules
 
-## Package Versions
+## Important Notes
 
-Current versions are tracked in [PKGBUILD](PKGBUILD):
+### Kernel Dependency
 
-- **ZFS Version**: See `_zfsver` variable
-- **Kernel Version**: See `_kernelver` variable
+This package is built specifically for the `linux-zen` kernel. The package version includes both:
+- ZFS version (e.g., `2.4.0`)
+- Kernel version (e.g., `6.18.3.zen1.1`)
+
+**The kernel module must match your installed kernel version exactly.**
+
+### Automatic Rebuilds
+
+The automation checks for updates to:
+1. OpenZFS releases (from GitHub)
+2. Arch Linux `linux-zen` package version
+
+When either updates, a new package is automatically built and published.
+
+### Update Frequency
+
+- **Check interval**: Every 6 hours
+- **Build time**: ~10-15 minutes after update detected
+- **Availability**: Packages available within 20 minutes of upstream release
+
+## How It Works
+
+### Automatic Updates
+
+The repository uses GitHub Actions to:
+
+1. **Check for Updates** (every 6 hours):
+   - Queries GitHub API for latest OpenZFS release
+   - Queries Arch repos for latest linux-zen version
+   - Compares with current PKGBUILD versions
+   - Updates PKGBUILD if either has a new version
+
+2. **Build Package** (on PKGBUILD changes):
+   - Installs linux-zen-headers
+   - Installs zfs-utils from custom repository
+   - Builds ZFS kernel modules
+   - Creates repository database
+   - Publishes to GitHub Pages
+
+### Workflow Files
+
+- `.github/workflows/auto-update.yml` - Automatic update checker (runs every 6 hours)
+- `.github/workflows/manual-update.yml` - Manual update trigger
+- `.github/workflows/build-and-publish.yml` - Package builder and publisher
+- `.github/actions/update-zfs-package/` - Shared update action
+
+## Repository Structure
+
+```
+zfs-linux-zen/
+├── PKGBUILD                    # Package build script
+├── zfs.install                 # Post-install hooks
+└── .github/
+    ├── workflows/
+    │   ├── auto-update.yml
+    │   ├── manual-update.yml
+    │   └── build-and-publish.yml
+    └── actions/
+        └── update-zfs-package/
+            ├── action.yml
+            └── update.sh
+```
+
+## GitHub Pages Setup
+
+To enable package hosting, you need to configure GitHub Pages:
+
+1. Go to repository **Settings** → **Pages**
+2. Under **Source**, select **GitHub Actions**
+3. Save the settings
+
+The first build will create the repository structure automatically.
+
+## Manual Updates
+
+You can manually trigger an update check:
+
+1. Go to **Actions** tab
+2. Select **Auto Update Package** workflow
+3. Click **Run workflow**
+
+Or force a package rebuild:
+
+1. Go to **Actions** tab
+2. Select **Build and Publish Package** workflow
+3. Click **Run workflow**
 
 ## Troubleshooting
 
-### Module Not Loading
-
-Ensure your installed kernel matches the package:
+### Module Won't Load
 
 ```bash
-# Check kernel version
+# Check if module matches kernel version
+modinfo zfs | grep vermagic
 uname -r
-
-# Check package version
-pacman -Qi zfs-linux-zen | grep Version
 ```
 
-If versions don't match, update your system:
-
-```bash
-sudo pacman -Syu
-```
+If versions don't match, wait for automatic rebuild or manually trigger update.
 
 ### Build Failures
 
-The package requires:
-- `linux-zen-headers` matching your kernel version
-- `base-devel` package group
-- `zfs-utils` at the same version as ZFS source
+Check the Actions tab for build logs. Common issues:
+- `zfs-utils` not available (build that repository first)
+- Kernel headers version mismatch
+- Upstream build issues
 
-### Out of Sync
+## Development
 
-If the package is out of sync with your kernel:
+### Testing the Update Script Locally
 
-1. Check for pending updates: `pacman -Syu`
-2. Check the [Actions tab](../../actions) for recent automation runs
-3. Trigger a manual update (maintainers only)
+```bash
+cd .github/actions/update-zfs-package
+./update.sh
+```
 
-## Contributing
+### Building Locally
 
-Contributions welcome! To improve the automation or package:
+```bash
+makepkg -s
+```
 
-1. Fork this repository
-2. Make your changes
-3. Test with the manual update workflow
-4. Submit a pull request
+**Note**: You need `linux-zen-headers` and `zfs-utils` installed to build locally.
 
-## Links
+## Upstream
 
-- **AUR Package**: https://aur.archlinux.org/packages/zfs-linux-zen
-- **OpenZFS**: https://openzfs.org/
-- **Arch Linux Zen Kernel**: https://archlinux.org/packages/extra/x86_64/linux-zen/
-- **Automation Scripts**: [archzfs/archzfs](https://github.com/archzfs/archzfs)
-
-## Maintainer
-
-- Jan Houben <jan@nexttrex.de>
+This repository is a fork of [archzfs/archzfs](https://github.com/archzfs/archzfs) with enhanced automation for faster updates.
 
 ## License
 
 CDDL (Common Development and Distribution License) - same as ZFS
 
-## Credits
+## Related Repositories
 
-- **OpenZFS Team**: For the ZFS filesystem
-- **Arch Linux**: For linux-zen kernel
-- **archzfs**: For original build infrastructure
-- **Community**: For testing and feedback
+- [zfs-utils](https://github.com/jasonthagerty/zfs-utils) - ZFS userspace utilities (required dependency)
