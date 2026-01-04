@@ -63,7 +63,21 @@ jobs:
               mkdir -p /workspace/repo
               mv /workspace/*.pkg.tar.zst /workspace/repo/
 
-              # Create repository database
+              # Download zfs-utils packages from the other repository
+              cd /workspace/repo
+              echo "Downloading zfs-utils packages from other repository..."
+
+              # Try to download all .pkg.tar.zst files from zfs-utils repo
+              # We parse the index.html to find package filenames
+              curl -sL https://jasonthagerty.github.io/zfs-utils/repo/index.html | \
+                grep -o "href=\"[^\"]*\.pkg\.tar\.zst\"" | \
+                sed "s/href=\"//;s/\"//" | \
+                while read -r pkg; do
+                  echo "Downloading $pkg..."
+                  curl -sL -O "https://jasonthagerty.github.io/zfs-utils/repo/$pkg" || echo "Failed to download $pkg"
+                done
+
+              # Create unified repository database with ALL packages
               cd /workspace/repo
               repo-add zfs-custom.db.tar.gz *.pkg.tar.zst
 

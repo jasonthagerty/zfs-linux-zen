@@ -7,7 +7,7 @@ cat > "$1" <<'EOF'
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ArchZFS Linux-Zen Repository</title>
+    <title>ArchZFS Unified Repository</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -59,16 +59,15 @@ cat > "$1" <<'EOF'
 </head>
 <body>
     <div class="container">
-        <h1>ArchZFS Linux-Zen Repository</h1>
+        <h1>ArchZFS Unified Repository</h1>
 
         <div class="info">
             <strong>Repository Status:</strong> Active and automatically updated every 6 hours
         </div>
 
         <h2>Installation</h2>
-        <p>Add both repositories to your <code>/etc/pacman.conf</code>:</p>
+        <p>Add this unified repository to your <code>/etc/pacman.conf</code>:</p>
         <pre><code>[zfs-custom]
-Server = https://jasonthagerty.github.io/zfs-utils/repo
 Server = https://jasonthagerty.github.io/zfs-linux-zen/repo
 SigLevel = Optional TrustAll</code></pre>
 
@@ -86,9 +85,11 @@ SigLevel = Optional TrustAll</code></pre>
 
         <h2>Available Packages</h2>
         <ul>
+            <li><code>zfs-utils</code> - ZFS userspace utilities and libraries</li>
             <li><code>zfs-linux-zen</code> - ZFS kernel modules for linux-zen kernel</li>
             <li><code>zfs-linux-zen-headers</code> - Development headers for ZFS modules</li>
         </ul>
+        <p><strong>Note:</strong> This is a unified repository containing packages from both zfs-utils and zfs-linux-zen. You only need to add this one repository to install all ZFS packages.</p>
 
         <h2>Automatic Updates</h2>
         <p>This repository automatically tracks the latest stable releases from:</p>
