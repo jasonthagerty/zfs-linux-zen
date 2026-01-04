@@ -42,12 +42,10 @@ jobs:
               pacman -S --noconfirm linux-zen-headers
 
               # Add custom repository to install zfs-utils
-              cat >> /etc/pacman.conf <<'"'"'EOFCONF'"'"'
-
-[archzfs]
-Server = https://jasonthagerty.github.io/zfs-utils/repo
-SigLevel = Optional TrustAll
-EOFCONF
+              echo "" >> /etc/pacman.conf
+              echo "[archzfs]" >> /etc/pacman.conf
+              echo "Server = https://jasonthagerty.github.io/zfs-utils/repo" >> /etc/pacman.conf
+              echo "SigLevel = Optional TrustAll" >> /etc/pacman.conf
 
               # Install zfs-utils from custom repository
               pacman -Sy --noconfirm
