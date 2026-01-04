@@ -43,7 +43,7 @@ jobs:
 
               # Add custom repository to install zfs-utils
               echo "" >> /etc/pacman.conf
-              echo "[archzfs]" >> /etc/pacman.conf
+              echo "[zfs-custom]" >> /etc/pacman.conf
               echo "Server = https://jasonthagerty.github.io/zfs-utils/repo" >> /etc/pacman.conf
               echo "SigLevel = Optional TrustAll" >> /etc/pacman.conf
 
@@ -65,7 +65,7 @@ jobs:
 
               # Create repository database
               cd /workspace/repo
-              repo-add archzfs.db.tar.gz *.pkg.tar.zst
+              repo-add zfs-custom.db.tar.gz *.pkg.tar.zst
 
               # Prepare Pages directory structure
               cd /workspace
