@@ -23,7 +23,7 @@ _kernelver_full="6.18.5.zen1-1"
 _extramodules="${_kernelver_full/.zen/-zen}-zen"
 
 pkgver="${_zfsver}_$(echo ${_kernelver} | sed s/-/./g)"
-pkgrel=1
+pkgrel=2
 makedepends=("linux-zen-headers=${_kernelver}")
 arch=("x86_64")
 url="https://openzfs.org/"
