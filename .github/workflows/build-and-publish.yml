@@ -26,87 +26,70 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Wait for zfs-utils to be available
+        run: |
+          ZFS_VER=$(grep -m1 '_zfsver=' PKGBUILD | tr -d '"' | cut -d= -f2)
+          echo "Required zfs-utils version: ${ZFS_VER}"
+          for i in $(seq 1 20); do
+            if curl -sL https://jasonthagerty.github.io/zfs-utils/repo/zfs-custom.db.tar.gz | tar -tz 2>/dev/null | grep -q "zfs-utils-${ZFS_VER}"; then
+              echo "zfs-utils ${ZFS_VER} is available"
+              exit 0
+            fi
+            echo "Attempt ${i}/20: zfs-utils ${ZFS_VER} not yet available, retrying in 30s..."
+            sleep 30
+          done
+          echo "Timed out waiting for zfs-utils ${ZFS_VER}"
+          exit 1
+
       - name: Build package and create repository
         run: |
-          # Run build in Arch Linux container
           docker run --rm \
             -v "$PWD:/workspace" \
             -w /workspace \
             archlinux:latest \
             bash -c '
-              # Update system and install build dependencies
               pacman -Syu --noconfirm
               pacman -S --noconfirm base-devel git
-
-              # Install linux-zen-headers (required for building ZFS kernel modules)
               pacman -S --noconfirm linux-zen-headers
-
-              # Add custom repository to install zfs-utils
               echo "" >> /etc/pacman.conf
               echo "[zfs-custom]" >> /etc/pacman.conf
               echo "Server = https://jasonthagerty.github.io/zfs-utils/repo" >> /etc/pacman.conf
               echo "SigLevel = Optional TrustAll" >> /etc/pacman.conf
-
-              # Install zfs-utils from custom repository
               pacman -Sy --noconfirm
-              pacman -S --noconfirm zfs-utils || echo "zfs-utils not found, continuing anyway"
-
-              # Create a build user (makepkg cannot run as root)
+              pacman -S --noconfirm zfs-utils
               useradd -m -G wheel builder
               echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
               chown -R builder:builder /workspace
-
-              # Build package
               su builder -c "cd /workspace && makepkg -s --noconfirm"
-
-              # Create repo directory and move packages
               mkdir -p /workspace/repo
               mv /workspace/*.pkg.tar.zst /workspace/repo/
-
-              # Download zfs-utils packages from the other repository
               cd /workspace/repo
               echo "Downloading zfs-utils packages from other repository..."
-
-              # Try to download all .pkg.tar.zst files from zfs-utils repo
-              # We parse the index.html to find package filenames
               curl -sL https://jasonthagerty.github.io/zfs-utils/repo/index.html | \
                 grep -o "href=\"[^\"]*\.pkg\.tar\.zst\"" | \
-                sed "s/href=\"//;s/\"//" | \
+                sed "s/href=\"//;s/\"$//" | \
                 while read -r pkg; do
                   echo "Downloading $pkg..."
                   curl -sL -O "https://jasonthagerty.github.io/zfs-utils/repo/$pkg" || echo "Failed to download $pkg"
                 done
-
-              # Create unified repository database with ALL packages
-              cd /workspace/repo
               repo-add zfs-custom.db.tar.gz *.pkg.tar.zst
-
-              # Prepare Pages directory structure
               cd /workspace
               mkdir -p _site
               cp -r repo _site/
-
-              # Fix permissions for all files
               chmod -R 777 /workspace/_site
             '
 
       - name: Generate repository index
         run: |
-          # Generate base HTML
           bash .github/workflows/generate-index.sh _site/repo/index.html
-
-          # Generate package file list
           cd _site/repo
           PACKAGE_LIST=""
           shopt -s nullglob
           for file in *.pkg.tar.zst *.db.tar.gz *.db *.files.tar.gz *.files; do
             if [ -f "$file" ]; then
-              PACKAGE_LIST="${PACKAGE_LIST}<li><a href=\"${file}\">${file}</a></li>
-"
+              PACKAGE_LIST="${PACKAGE_LIST}<li><a href=\"${file}\">${file}</a></li>\n"
             fi
           done
-
-          # Insert package list into HTML
           if [ -n "$PACKAGE_LIST" ]; then
             sed -i "s|<!-- Package list will be inserted here during build -->|${PACKAGE_LIST}|" index.html
           else
