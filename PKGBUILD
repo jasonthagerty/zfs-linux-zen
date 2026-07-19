@@ -18,12 +18,12 @@
 pkgbase="zfs-linux-zen"
 pkgname=("zfs-linux-zen" "zfs-linux-zen-headers")
 _zfsver="2.4.3"
-_kernelver="7.1.3.zen2-2"
-_kernelver_full="7.1.3.zen2-2"
+_kernelver="7.1.4.zen1-1"
+_kernelver_full="7.1.4.zen1-1"
 _extramodules="${_kernelver_full/.zen/-zen}-zen"
 
 pkgver="${_zfsver}_$(echo ${_kernelver} | sed s/-/./g)"
-pkgrel=2
+pkgrel=1
 makedepends=("linux-zen-headers=${_kernelver}")
 arch=("x86_64")
 url="https://openzfs.org/"
