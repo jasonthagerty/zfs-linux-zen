@@ -48,6 +48,10 @@ jobs:
             -w /workspace \
             archlinux:latest \
             bash -c '
+              # Fail loudly if any build step fails (e.g. makepkg), instead of
+              # silently publishing a repo that is missing the zfs-linux-zen packages
+              set -e
+
               pacman -Syu --noconfirm
               pacman -S --noconfirm base-devel git
               pacman -S --noconfirm linux-zen-headers
